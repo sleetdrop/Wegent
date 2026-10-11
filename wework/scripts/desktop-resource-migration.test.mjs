@@ -1,8 +1,11 @@
+import { readFileSync } from 'node:fs'
 import { access, readFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, test } from 'vitest'
 
+const require = createRequire(import.meta.url)
 const weworkRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const legacyRustDesktopDirectory = ['src', ['t', 'a', 'u', 'r', 'i'].join('')].join('-')
 const scripts = [
@@ -261,7 +264,7 @@ describe('desktop resource migration', () => {
     expect(source).toContain('WEWORK_ONLINE_UPDATE_INCLUDE_COMPONENTS')
   })
 
-  test('collects the electron-builder Linux x64 artifact name', async () => {
+  test('collects the electron-builder Linux x64 artifact names', async () => {
     const source = await readFile(
       join(weworkRoot, 'scripts/prepare-desktop-release-assets.mjs'),
       'utf8'
@@ -271,10 +274,43 @@ describe('desktop resource migration', () => {
       "const installerArchitecture = platform === 'linux' && arch === 'x64' ? 'x86_64' : arch"
     )
     expect(source).toContain(
+      "const debianArchitecture = platform === 'linux' && arch === 'x64' ? 'amd64' : arch"
+    )
+    expect(source).toContain(
       "const useComponentizedHostUpdate = process.env.WEWORK_USE_COMPONENTIZED_HOST_UPDATE === 'true'"
     )
     expect(source).toContain('linux_${installerArchitecture}\\\\.AppImage')
+    expect(source).toContain('linux_${debianArchitecture}\\\\.deb')
     expect(source).toContain('WeWorkHostUpdate_${escape(version)}_linux_')
+  })
+
+  test('packages a Debian installer for full Linux releases', () => {
+    const configPath = require.resolve(join(weworkRoot, 'electron/electron-builder.config.cjs'))
+    const metadata = JSON.parse(readFileSync(join(weworkRoot, 'electron/package.json'), 'utf8'))
+
+    try {
+      const config = require(configPath)
+
+      expect(config.linux.target).toEqual(['AppImage', 'deb'])
+      // Electron Builder expands this ICNS into the freedesktop icon size set.
+      expect(config.linux.icon).toBe(join(weworkRoot, 'resources', 'icons', 'icon.icns'))
+      // fpm rejects deb packaging when the maintainer or the project homepage is missing.
+      expect(config.linux.maintainer).toMatch(/^\S.* <[^@\s]+@[^@\s]+>$/)
+      // The vendor mirrors the company identity of the macOS and Windows packages.
+      expect(config.linux.vendor).toBe('Wecode')
+      expect(metadata.homepage).toMatch(/^https:\/\/\S+$/)
+      // The installed desktop entry, StartupWMClass, and the Electron app_id must agree.
+      expect(config.linux.syncDesktopName).toBe(true)
+      expect(config.extraMetadata.desktopName).toBe(`${config.executableName}.desktop`)
+
+      // The componentized Host update has no Linux installer to update yet.
+      process.env.WEWORK_ONLINE_UPDATE_BUILD = 'true'
+      delete require.cache[configPath]
+      expect(require(configPath).linux.target).toEqual(['AppImage'])
+    } finally {
+      delete process.env.WEWORK_ONLINE_UPDATE_BUILD
+      delete require.cache[configPath]
+    }
   })
 
   test('creates component archives from immutable prepared resources', async () => {

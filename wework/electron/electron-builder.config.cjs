@@ -31,6 +31,9 @@ module.exports = {
   beforePack: macosAppIcon.prepare,
   extraMetadata: {
     name: identity.packageName,
+    // Electron derives its Linux app_id / WM_CLASS from this value, so the installed
+    // .desktop entry and StartupWMClass stay associated with the running window.
+    desktopName: `${identity.executableName}.desktop`,
     weworkUpdateBaseUrl: updateBaseUrl,
     weworkAppId: identity.identifier,
     weworkProductName: identity.productName,
@@ -100,6 +103,20 @@ module.exports = {
     artifactName: `${artifactPrefix}_\${version}_linux_\${arch}.\${ext}`,
     category: 'Development',
     electronLanguages: ['en-US', 'zh-CN'],
-    target: ['AppImage'],
+    // Electron Builder converts this ICNS into the multi-size PNG set that the
+    // freedesktop icon theme and the AppImage expect.
+    icon: path.resolve(__dirname, '../resources/icons/icon.icns'),
+    // fpm rejects deb packaging without a maintainer that carries an email address.
+    maintainer: 'Yuan <sleetdrop@gmail.com>',
+    // Match the company identity the macOS bundle and the Windows version resource use.
+    vendor: 'Wecode',
+    synopsis: 'Wework desktop workbench',
+    description: 'Desktop workbench for organizing work and running AI coding agents.',
+    // Derive the installed .desktop file name from desktopName so it matches the
+    // Electron app_id / WM_CLASS that window association relies on.
+    syncDesktopName: true,
+    // The Debian installer is only published as a full package: Linux has no in-app
+    // update path yet, so the componentized Host update build stays AppImage-only.
+    target: onlineUpdateBuild ? ['AppImage'] : ['AppImage', 'deb'],
   },
 }

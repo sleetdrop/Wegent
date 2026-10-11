@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.5.7-beta.2",
   "description": "Wework desktop workbench",
+  "homepage": "https://github.com/wecode-ai/Wegent",
   "author": "Wecode",
   "type": "module",
   "main": "dist/main.js",

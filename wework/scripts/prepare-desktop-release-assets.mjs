@@ -26,6 +26,7 @@ if (!platform || !arch || !version || !outputDirectory) {
 
 const output = resolve(outputDirectory)
 const installerArchitecture = platform === 'linux' && arch === 'x64' ? 'x86_64' : arch
+const debianArchitecture = platform === 'linux' && arch === 'x64' ? 'amd64' : arch
 const useComponentizedHostUpdate = process.env.WEWORK_USE_COMPONENTIZED_HOST_UPDATE === 'true'
 await rm(output, { recursive: true, force: true })
 await mkdir(output, { recursive: true })
@@ -72,6 +73,13 @@ if (platform === 'macos') {
     installerRoot,
     new RegExp(`^WeWork_${escape(version)}_linux_${installerArchitecture}\\.AppImage$`)
   )
+  const deb = await findFile(
+    installerRoot,
+    new RegExp(`^WeWork_${escape(version)}_linux_${debianArchitecture}\\.deb$`)
+  )
+  // The Debian installer is published for manual installation. It is not an update
+  // artifact yet because Linux has no in-app update path.
+  await cp(deb, join(output, basename(deb)))
   await copyUpdateArtifacts([
     appImage,
     ...(useComponentizedHostUpdate
