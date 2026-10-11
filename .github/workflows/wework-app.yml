@@ -203,12 +203,19 @@ jobs:
             cargo_target: x86_64-pc-windows-msvc
             codex_target: x86_64-pc-windows-msvc
           - name: Linux x64
-            runner: ubuntu-latest
+            runner: ubuntu-24.04
             platform: linux
             arch: x64
             node_arch: x64
             cargo_target: x86_64-unknown-linux-gnu
             codex_target: x86_64-unknown-linux-gnu
+          - name: Linux arm64
+            runner: ubuntu-24.04-arm
+            platform: linux
+            arch: arm64
+            node_arch: arm64
+            cargo_target: aarch64-unknown-linux-gnu
+            codex_target: aarch64-unknown-linux-gnu
 
     steps:
       - name: Checkout code
@@ -368,12 +375,55 @@ jobs:
           pnpm --filter wework e2e:desktop -- \
             --parallel-segments release-package-startup,component-update,app-update-full
 
+      - name: Verify formal Linux Debian package
+        if: matrix.platform == 'linux'
+        env:
+          WEWORK_E2E_APP_BIN: /opt/WeWork/WeWork
+          WEWORK_E2E_EXECUTOR_BIN: /opt/WeWork/resources/bin/wegent-executor
+          WEWORK_E2E_ISOLATED_XVFB: "true"
+          WEWORK_E2E_REQUIRE_RELEASE_PACKAGE: "1"
+        run: |
+          set -euo pipefail
+          release_version="${{ needs.prepare-release.outputs.version }}"
+          case "${{ matrix.arch }}" in
+            x64) deb_arch=amd64 ;;
+            *) deb_arch="${{ matrix.arch }}" ;;
+          esac
+          deb="$(find "${GITHUB_WORKSPACE}/wework/electron/release-installer" \
+            -maxdepth 1 -name "WeWork_*_linux_${deb_arch}.deb" -print -quit)"
+          test -n "$deb" || { echo "The Debian package was not built" >&2; exit 1; }
+          package="$(dpkg-deb -f "$deb" Package)"
+          test -n "$package"
+          # Debian versions cannot contain a hyphen; electron-builder maps it to a tilde.
+          test "$(dpkg-deb -f "$deb" Version)" = "${release_version//-/\~}"
+          dpkg-deb -f "$deb" Maintainer | grep -q '@'
+          sudo apt-get update
+          sudo apt-get install -y "$deb"
+          # The isolated Electron E2E session starts its own Xvfb display and Openbox
+          # window manager, and the runner script detects the registration with xprop.
+          sudo apt-get install -y xvfb openbox x11-utils xauth
+          for tool in xvfb-run openbox xprop xauth; do
+            command -v "$tool" >/dev/null || { echo "Missing isolated E2E tool: $tool" >&2; exit 1; }
+          done
+          dpkg --status "$package" >/dev/null
+          test -x /opt/WeWork/WeWork
+          test -L /usr/bin/WeWork
+          test -f /usr/share/applications/WeWork.desktop
+          # The Debian package must ship the configured icon set, not the Electron default.
+          test -f /usr/share/icons/hicolor/32x32/apps/WeWork.png
+          test -f /usr/share/icons/hicolor/512x512/apps/WeWork.png
+          # Ubuntu 24+ needs the installed AppArmor profile for the Chromium sandbox.
+          test -f /opt/WeWork/resources/apparmor-profile
+          # The Electron E2E runner keeps the sandbox enabled for non-root runs, so this
+          # starts the installed application through the real Debian installation.
+          pnpm --filter wework e2e:desktop -- --segment release-package-startup
+
       - name: Prune formal release verification diagnostics
-        if: failure() && matrix.platform == 'macos' && matrix.arch == 'arm64'
+        if: failure() && (matrix.platform == 'linux' || (matrix.platform == 'macos' && matrix.arch == 'arm64'))
         run: .github/scripts/prune-wework-desktop-e2e-diagnostics.sh
 
       - name: Upload formal release verification diagnostics
-        if: failure() && matrix.platform == 'macos' && matrix.arch == 'arm64'
+        if: failure() && (matrix.platform == 'linux' || (matrix.platform == 'macos' && matrix.arch == 'arm64'))
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
@@ -593,6 +643,7 @@ jobs:
                   "release-manifests/components-${channel}-macos-x64.json" \
                   "release-manifests/components-${channel}-windows-x64.json" \
                   "release-manifests/components-${channel}-linux-x64.json" \
+                  "release-manifests/components-${channel}-linux-arm64.json" \
                   --clobber
                 return
               fi
@@ -620,6 +671,7 @@ jobs:
               "release-manifests/components-${channel}-macos-x64.json" \
               "release-manifests/components-${channel}-windows-x64.json" \
               "release-manifests/components-${channel}-linux-x64.json" \
+              "release-manifests/components-${channel}-linux-arm64.json" \
               --clobber
             gh release upload wework-updater \
               "release-manifests/${electron_channel}.yml" \

@@ -33,6 +33,7 @@ test('generates Electron and component rolling manifests from one release', asyn
     ['macos', 'x64'],
     ['windows', 'x64'],
     ['linux', 'x64'],
+    ['linux', 'arm64'],
   ]) {
     const components = {}
     for (const [id, componentVersion] of [

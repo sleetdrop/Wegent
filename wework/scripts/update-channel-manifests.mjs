@@ -61,6 +61,7 @@ export function expectedChannelAssetNames(channel) {
     `components-${channel}-macos-x64.json`,
     `components-${channel}-windows-x64.json`,
     `components-${channel}-linux-x64.json`,
+    `components-${channel}-linux-arm64.json`,
   ]
 }
 

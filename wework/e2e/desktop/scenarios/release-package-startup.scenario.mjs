@@ -167,9 +167,13 @@ async function assertReleasePackageResources() {
   if (process.env.WEWORK_E2E_REQUIRE_RELEASE_PACKAGE !== '1') {
     return components
   }
+  // A formal release binary is either an electron-builder output under release-installer
+  // or, on Linux, the executable installed from the published package.
+  const formalReleaseBinary =
+    process.platform === 'linux' ? /release-installer|\/opt\/[^/]+\// : /release-installer/
   assert.match(
     appBinary,
-    /release-installer/,
+    formalReleaseBinary,
     `Release startup E2E was not given a formal release binary: ${appBinary}`
   )
   if (process.platform === 'darwin') await assertMacosMicrophoneSigning(appBinary)

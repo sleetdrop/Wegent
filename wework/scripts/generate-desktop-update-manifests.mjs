@@ -72,6 +72,7 @@ for (const [platform, architecture] of [
   ['macos', 'x64'],
   ['windows', 'x64'],
   ['linux', 'x64'],
+  ['linux', 'arm64'],
 ]) {
   const sourcePath = resolve(assets, `components-${platform}-${architecture}.json`)
   let source

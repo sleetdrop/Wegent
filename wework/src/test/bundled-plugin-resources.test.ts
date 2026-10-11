@@ -365,6 +365,12 @@ describe('bundled plugin resources', () => {
     expect(workflow).toMatch(
       /name: macOS x64\s+runner: macos-14\s+platform: macos\s+arch: x64\s+node_arch: x64/
     )
+    expect(workflow).toMatch(
+      /name: Linux x64\s+runner: ubuntu-24\.04\s+platform: linux\s+arch: x64/
+    )
+    expect(workflow).toMatch(
+      /name: Linux arm64\s+runner: ubuntu-24\.04-arm\s+platform: linux\s+arch: arm64/
+    )
     expect(workflow).toContain('- name: Install Rosetta 2')
     expect(workflow).toContain('architecture: ${{ matrix.node_arch }}')
     expect(workflow.indexOf('- name: Verify native build architecture')).toBeGreaterThan(
@@ -374,7 +380,11 @@ describe('bundled plugin resources', () => {
       workflow.indexOf('- name: Install workspace dependencies')
     )
     expect(workflow).toContain('- name: Upload formal release verification diagnostics')
-    expect(workflow).toContain('if: failure() && matrix.platform ==')
+    // The macOS arm64 and Linux release jobs upload desktop E2E diagnostics on failure.
+    expect(workflow).toMatch(
+      /if: failure\(\) && \(matrix\.platform == 'linux' \|\| \(matrix\.platform == 'macos' && matrix\.arch == 'arm64'\)\)/
+    )
+    expect(workflow).toContain('- name: Verify formal Linux Debian package')
     expect(workflow).toContain('wework/test-results/desktop-e2e/')
     expect(workflow).toContain('WEWORK_ELECTRON_DEPENDENCIES_READY: "true"')
     expect(workflow).toContain('WEWORK_E2E_PARALLEL_CHECKPOINTS: "3"')
