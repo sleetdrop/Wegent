@@ -45,11 +45,10 @@ jobs:
     steps:
       - name: Create release app token
         id: release-app-token
-        uses: actions/create-github-app-token@v3
-        with:
-          app-id: ${{ vars.RELEASE_APP_ID || secrets.RELEASE_APP_ID || vars.RELEASE_APP_CLIENT_ID || secrets.RELEASE_APP_CLIENT_ID }}
-          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
-          permission-contents: write
+        # Fork test build only: the upstream release GitHub App is not configured here.
+        run: |
+          echo "token=${{ github.token }}" >> "$GITHUB_OUTPUT"
+          echo "app-slug=wework-fork-test" >> "$GITHUB_OUTPUT"
 
       - name: Checkout code
         uses: actions/checkout@v4
@@ -181,27 +180,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: macOS arm64
-            runner: macos-14
-            platform: macos
-            arch: arm64
-            node_arch: arm64
-            cargo_target: aarch64-apple-darwin
-            codex_target: aarch64-apple-darwin
-          - name: macOS x64
-            runner: macos-14
-            platform: macos
-            arch: x64
-            node_arch: x64
-            cargo_target: x86_64-apple-darwin
-            codex_target: x86_64-apple-darwin
-          - name: Windows x64
-            runner: windows-latest
-            platform: windows
-            arch: x64
-            node_arch: x64
-            cargo_target: x86_64-pc-windows-msvc
-            codex_target: x86_64-pc-windows-msvc
           - name: Linux x64
             runner: ubuntu-24.04
             platform: linux
@@ -216,7 +194,6 @@ jobs:
             node_arch: arm64
             cargo_target: aarch64-unknown-linux-gnu
             codex_target: aarch64-unknown-linux-gnu
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -484,11 +461,10 @@ jobs:
     steps:
       - name: Create release app token
         id: release-app-token
-        uses: actions/create-github-app-token@v3
-        with:
-          app-id: ${{ vars.RELEASE_APP_ID || secrets.RELEASE_APP_ID || vars.RELEASE_APP_CLIENT_ID || secrets.RELEASE_APP_CLIENT_ID }}
-          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
-          permission-contents: write
+        # Fork test build only: the upstream release GitHub App is not configured here.
+        run: |
+          echo "token=${{ github.token }}" >> "$GITHUB_OUTPUT"
+          echo "app-slug=wework-fork-test" >> "$GITHUB_OUTPUT"
 
       - name: Checkout release source
         uses: actions/checkout@v4
