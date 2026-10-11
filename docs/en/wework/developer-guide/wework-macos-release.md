@@ -80,8 +80,61 @@ Artifacts are written under `wework/electron/release-installer/`:
 WeWork_<version>_macos_<arch>.dmg
 WeWork_<version>_macos_<arch>.zip
 WeWork_<version>_windows_x64-setup.exe
-WeWork_<version>_linux_x64.AppImage
+WeWork_<version>_linux_x86_64.AppImage
+WeWork_<version>_linux_amd64.deb
+WeWork_<version>_linux_arm64.AppImage
+WeWork_<version>_linux_arm64.deb
 ```
+
+The AppImage architecture name is `x86_64` and the Debian package uses `amd64`;
+both arm64 artifacts use `arm64`. A dpkg version cannot contain a hyphen, so
+electron-builder writes it as `~`: `0.5.7-beta.2` becomes `0.5.7~beta.2` in the
+package metadata, while the file name keeps the original version.
+
+## Linux installers
+
+Linux publishes an AppImage and a Debian package for x64 and for arm64, built
+natively on `ubuntu-24.04` and `ubuntu-24.04-arm` so both architectures share one
+Ubuntu baseline and glibc floor. That baseline also sets the supported range: the
+packaged `wegent-executor` inherits symbol versions from its build host and
+requires `GLIBC_2.39` when built on Ubuntu 24.04, so the deb and the AppImage
+target Ubuntu 24.04 and newer; both ship the same executor, so their range is
+identical. Covering 22.04 means pinning the Linux targets to
+`ubuntu-22.04`/`ubuntu-22.04-arm` or building the executor against an older glibc
+baseline; changing only the deb side is not enough. The AppImage requires FUSE 2 on
+the host (Ubuntu 24.04 no longer provides `libfuse2` by default), has no
+installation hooks, and starts Electron with `--no-sandbox` from its desktop entry.
+The Debian package installs into `/opt/WeWork`, ships
+`/usr/share/applications/WeWork.desktop` and hicolor icons, and its postinst
+creates `/usr/bin/WeWork`, refreshes the desktop and mime databases, fixes
+`chrome-sandbox` permissions, and installs an AppArmor profile on Ubuntu 24+, so the
+application runs inside the Chromium sandbox. Ubuntu and Debian users should prefer
+the deb:
+
+```bash
+sudo apt install ./WeWork_<version>_linux_amd64.deb
+```
+
+Linux reuses the committed `wework/resources/icons/icon.icns`: Electron Builder
+converts it into the multi-size PNG set the freedesktop icon theme needs, and the
+AppImage uses the same artwork. Do not point this at
+`wework/resources/icons/icon.png`, which is the raw glyph artwork without the
+rounded app-icon plate and yields a single 512x512 image.
+
+Linux packaging writes `desktopName` through `extraMetadata` and enables
+`linux.syncDesktopName`, so the installed `.desktop` file name, `StartupWMClass`,
+and Electron's `app_id` agree and desktop environments associate running windows
+with the entry. Branded builds reuse that derived value instead of a hard-coded
+product name.
+
+Electron Builder builds the Debian package with its fpm target and prepares fpm
+itself. Both `homepage` in `wework/electron/package.json` and `maintainer` in the
+`linux` configuration must exist, otherwise the deb build fails. `linux.vendor`
+stays on `Wecode`, the company identity used by the macOS copyright field and the
+Windows version resource, while `maintainer` must carry a contact email and is set
+separately. Linux has no in-app update path yet, so the Debian package is published
+as a complete package for manual installation and reinstallation and is not part of
+the rolling update channel.
 
 ## Automatic updates
 
@@ -98,8 +151,12 @@ avoiding low-reuse Range request bursts, duplicate traffic, and extra disk
 usage. Component updates still reuse unchanged components by content hash.
 
 The release workflow emits only Electron YAML update manifests and component
-manifests. macOS and Windows use Electron's ZIP and NSIS update paths. Linux
-continues to use manual AppImage replacement.
+manifests, and those YAML manifests contain macOS and Windows artifacts only: the
+`latest-linux.yml` a Linux client requests does not exist, so the client reports
+no available update. macOS and Windows use Electron's ZIP and NSIS update paths.
+Linux has no in-app update path: replace the AppImage manually, or reinstall the
+Debian package with `sudo apt install ./WeWork_<version>_linux_amd64.deb`. Linux
+component manifests are still published, but they never trigger a Host update.
 
 ## Initial package and component updates
 
@@ -372,6 +429,18 @@ pnpm --dir wework/electron test
 pnpm --dir wework/electron build:release
 ```
 
+A Debian package can be inspected without installing it:
+
+```bash
+dpkg-deb -I wework/electron/release-installer/WeWork_<version>_linux_amd64.deb
+dpkg-deb -c wework/electron/release-installer/WeWork_<version>_linux_amd64.deb
+```
+
+After installation on Ubuntu, `/usr/bin/WeWork`,
+`/usr/share/applications/WeWork.desktop`,
+`/opt/WeWork/resources/apparmor-profile`, and the `chrome-sandbox` permissions must
+exist, and the application must start without disabling the Chromium sandbox.
+
 Changes to windows, tray behavior, IPC, the built-in browser, sidecars, or
 packaged resources must also be verified in an isolated real Electron session:
 
@@ -396,6 +465,14 @@ dependencies owned by `wework/electron`, prepares bundled sidecars, and calls
 the unified Electron build command. Desktop resource changes belong in
 `wework/resources/` or the Electron packaging scripts, not in a duplicated
 workflow resource list.
+
+After each Linux build, the workflow installs the Debian package it just produced
+on the matching x64 and arm64 target, verifies the package metadata,
+`/usr/bin/WeWork`, the desktop entry, the hicolor icon, and the AppArmor profile,
+and then starts the installed application through the real Electron E2E
+`release-package-startup` checkpoint. Non-root E2E runs keep the Chromium sandbox
+enabled, so this step also verifies the sandbox and AppArmor setup created by the
+postinst. Failures upload the desktop E2E diagnostics.
 
 A rolling channel may skip an equal-version upload only when both Electron
 YAML manifests and component manifests for all four build targets exist. The

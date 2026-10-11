@@ -71,8 +71,51 @@ pnpm --dir wework/electron build:release
 WeWork_<version>_macos_<arch>.dmg
 WeWork_<version>_macos_<arch>.zip
 WeWork_<version>_windows_x64-setup.exe
-WeWork_<version>_linux_x64.AppImage
+WeWork_<version>_linux_x86_64.AppImage
+WeWork_<version>_linux_amd64.deb
+WeWork_<version>_linux_arm64.AppImage
+WeWork_<version>_linux_arm64.deb
 ```
+
+AppImage 的架构名是 `x86_64`，Debian 包是 `amd64`；arm64 的两种产物都使用 `arm64`。
+dpkg 版本号不允许连字符，electron-builder 会写成 `~`，所以 `0.5.7-beta.2` 在包元数据
+中是 `0.5.7~beta.2`，文件名仍保留原始版本号。
+
+## Linux 安装包
+
+Linux 同时产出 AppImage 和 Debian 包，x64 与 arm64 各一套，分别由 `ubuntu-24.04`
+和 `ubuntu-24.04-arm` 原生构建，使两个架构共享同一个 Ubuntu 基线和 glibc 下限。
+该基线也决定了产物的适用范围：包内 `wegent-executor` 从构建宿主继承符号版本，
+在 Ubuntu 24.04 上实测要求 `GLIBC_2.39`，因此 deb 和 AppImage 都适用于 Ubuntu 24.04
+及更高版本（两者打包同一份 executor，适用范围一致）。需要覆盖 22.04 时，要么把
+Linux 目标固定到 `ubuntu-22.04`/`ubuntu-22.04-arm`，要么让 executor 使用更低的 glibc
+基线构建，不能只在 deb 侧调整。
+AppImage 需要宿主预装 FUSE 2（Ubuntu 24.04 起默认不再提供 `libfuse2`），也没有安装
+期钩子，且它的 desktop entry 以 `--no-sandbox` 启动 Electron；Debian 包安装到
+`/opt/WeWork`，包内携带 `/usr/share/applications/WeWork.desktop` 和 hicolor 图标，
+postinst 建立 `/usr/bin/WeWork`、刷新 desktop/mime 数据库、修正 `chrome-sandbox`
+权限，并在 Ubuntu 24+ 安装 AppArmor profile，因此应用运行在 Chromium 沙箱内。
+Ubuntu 和 Debian 用户应优先使用 deb：
+
+```bash
+sudo apt install ./WeWork_<version>_linux_amd64.deb
+```
+
+Linux 图标沿用已提交的 `wework/resources/icons/icon.icns`：electron-builder 会把它
+转换成 freedesktop 图标主题需要的多尺寸 PNG，AppImage 也使用同一份图标。不要改成
+`wework/resources/icons/icon.png`，那只是不带圆角底板的原始字形素材，而且只会产出
+单一 512×512 尺寸。
+
+Linux 打包在 `extraMetadata` 中写入 `desktopName`，并开启 `linux.syncDesktopName`，
+让安装的 `.desktop` 文件名、`StartupWMClass` 与 Electron 的 `app_id` 保持一致，桌面
+环境才能把运行中的窗口关联到该入口。品牌构建沿用同一个派生值，不要写死产品名。
+
+Debian 包由 electron-builder 的 fpm 目标生成，fpm 由 electron-builder 自动准备。
+构建前必须同时具备 `wework/electron/package.json` 的 `homepage` 和 `linux` 配置里
+的 `maintainer`，否则 deb 构建直接失败。`linux.vendor` 固定为 macOS 包版权字段和
+Windows 版本资源使用的公司身份 `Wecode`；`maintainer` 是需要联系邮箱的打包维护者，
+两者不能共用同一个值。Linux 尚未接入应用内自动升级，Debian 包只作为手工安装和
+覆盖升级的完整安装包发布，不进入滚动更新通道。
 
 ## 自动升级
 
@@ -85,9 +128,12 @@ Wework 禁用 `electron-updater` 的差分下载和旧 ZIP 缓存。macOS 与 Wi
 客户端只下载经过压缩的完整 Host 更新包，避免低复用率差分产生大量 Range 请求、
 重复流量和额外磁盘占用。组件更新仍按内容哈希复用未变化的组件。
 
-发布流程只生成 Electron YAML 更新清单和组件清单。macOS 和 Windows 使用
-Electron 自身的 ZIP/NSIS 更新链路；Linux 暂不提供应用内自动升级，继续使用
-AppImage 手工替换。
+发布流程只生成 Electron YAML 更新清单和组件清单，且 YAML 清单只包含 macOS 和
+Windows 产物：客户端在 Linux 上请求的 `latest-linux.yml` 不存在，因此把 Linux 视为
+“暂无可用更新”。macOS 和 Windows 使用 Electron 自身的 ZIP/NSIS 更新链路；Linux
+暂不提供应用内自动升级，AppImage 用新文件手工替换，Debian 包用
+`sudo apt install ./WeWork_<version>_linux_amd64.deb` 覆盖安装。Linux 组件清单照常
+发布，但不会触发宿主更新。
 
 ## 初始包与组件更新
 
@@ -289,6 +335,17 @@ pnpm --dir wework/electron test
 pnpm --dir wework/electron build:release
 ```
 
+Debian 包无需安装即可检查控制字段和安装布局：
+
+```bash
+dpkg-deb -I wework/electron/release-installer/WeWork_<version>_linux_amd64.deb
+dpkg-deb -c wework/electron/release-installer/WeWork_<version>_linux_amd64.deb
+```
+
+安装到 Ubuntu 后，`/usr/bin/WeWork`、`/usr/share/applications/WeWork.desktop`、
+`/opt/WeWork/resources/apparmor-profile` 和 `chrome-sandbox` 权限必须存在，并且
+应用在不禁用 Chromium 沙箱的情况下能够启动。
+
 涉及窗口、托盘、IPC、内置浏览器、sidecar 或打包资源时，还必须使用隔离的真实
 Electron 会话验证：
 
@@ -308,6 +365,12 @@ pnpm --filter wework ai:verify start --packaged true
 `wework/electron` 自己的依赖，准备 bundled sidecars，再调用统一的 Electron
 构建命令。桌面资源变化应修改 `wework/resources/` 或 Electron 打包脚本，不要在
 workflow 中复制另一份资源列表。
+
+Linux 构建完成后，工作流会在 x64 与 arm64 目标上分别安装刚生成的 Debian 包，校验
+包元数据、`/usr/bin/WeWork`、桌面入口、hicolor 图标和 AppArmor profile，再用真实
+Electron E2E 的 `release-package-startup` 场景启动已安装应用。非 root 运行时 E2E 不会
+禁用 Chromium 沙箱，因此这一步同时验证 postinst 建立的沙箱与 AppArmor 配置；失败时
+上传桌面 E2E 诊断产物定位根因。
 
 滚动通道只有在 Electron YAML 和四个构建目标的组件清单全部存在时，才可因版本
 未变而跳过上传。相同版本但资产不完整时必须补齐；如果远端是不完整的更高版本，
