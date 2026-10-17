@@ -12,6 +12,8 @@ The menu contains only unambiguous, genuinely useful items: the application and 
 
 Menu items follow the current workbench state: when an action is not available on the current surface — for example there is no closable tab, or the active surface is not a task workspace — the item is hidden instead of remaining as a clickable entry that does nothing. Menu actions reuse the controls that already exist in the interface; they never introduce a second navigation path.
 
+The Developer tools submenu also offers a **Process Manager**. It opens a separate window listing the processes this application runs (task type, CPU, memory, process ID). Only disposable helper processes (GPU, network service, and similar) show an **End Task** button, and ending one requires confirmation. The application process and the renderer processes that host window contents never offer this action, and the host rejects both kinds of request.
+
 ## Use top-level tabs
 
 The Wework desktop app uses top-level tabs for tasks, project spaces, agents, and other product pages. Sidebar links navigate within the active tab. A new tab is created only when you select the top-bar **+** or another explicit new-tab action from a tab menu.

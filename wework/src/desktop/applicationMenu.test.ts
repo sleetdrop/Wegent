@@ -61,6 +61,11 @@ describe('application menu navigation actions', () => {
     expect(mocks.openDeveloperCommandMenu).toHaveBeenCalledOnce()
   })
 
+  test('opens the process manager through the desktop host', () => {
+    emit('open-process-manager')
+    expect(mocks.invoke).toHaveBeenCalledWith('developer.openProcessManager')
+  })
+
   test('opens task search through the workbench shell event', () => {
     emit('open-search')
     expect(mocks.requestOpenTaskSearch).toHaveBeenCalledOnce()

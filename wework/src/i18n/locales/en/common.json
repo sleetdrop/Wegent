@@ -18,6 +18,26 @@
   "navigation": {
     "home": "Home"
   },
+  "process_manager": {
+    "title": "Process Manager",
+    "subtitle": "Processes running for this application.",
+    "refresh": "Refresh",
+    "column_task": "Task",
+    "column_cpu": "CPU %",
+    "column_memory": "Memory",
+    "column_pid": "Process ID",
+    "application_process": "Application",
+    "end_task": "End Task",
+    "confirm": "Confirm",
+    "group.main": "Application",
+    "group.webkit-gpu": "GPU Process",
+    "group.webkit-networking": "Network Service",
+    "group.webkit-other": "Utility Process",
+    "group.webkit-webcontent": "Window",
+    "group.executor": "Executor",
+    "group.codex-app-server": "Codex App Server",
+    "group.child": "Child Process"
+  },
   "project_ai": {
     "file_unavailable": "This project executor cannot read the selected file. Use a local project or upload it in the task details.",
     "model_unavailable": "Could not load models. Please try again later."

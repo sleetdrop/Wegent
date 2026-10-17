@@ -17,6 +17,7 @@ const MENU_ITEM_IDS = [
   'developer.devTools',
   'developer.commands',
   'developer.logs',
+  'developer.processManager',
 ]
 
 // Items whose visibility is capability-driven: hidden until the workbench
@@ -144,6 +145,19 @@ export async function createDesktopScenario({ captureScreenshot, uiTimeoutMs }) 
       await control.command('press', '[data-testid="developer-command-open-web-inspector"]', {
         key: 'Escape',
       })
+
+      // The Process Manager opens as its own window through the same menu. Its
+// window content is covered by unit tests; here we assert the menu wiring and
+// that the host accepts the activation (which creates the window).
+      assert.equal(
+        JSON.parse(
+          await control.command('activateApplicationMenu', 'body', {
+            value: 'developer.processManager',
+          })
+        ),
+        true,
+        'The Process Manager menu item could not be activated'
+      )
 
       // Every capability-gated item stays hidden while the workbench is
       // replaced by settings, so no dead action is presented to the user.

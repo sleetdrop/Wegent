@@ -11,6 +11,13 @@ export interface ProcessDiagnosticsProcess {
   physical_footprint_kib: number
   cpu_percent: number
   command: string
+  /**
+   * Whether the process manager may offer "End Task" for this process.
+   * Only disposable Chromium helper processes qualify; the application's own
+   * browser process and renderer (window) processes never do, because ending
+   * them would terminate the app or discard a window's live work.
+   */
+  terminable: boolean
 }
 
 export interface ProcessDiagnosticsGroup {
@@ -86,6 +93,50 @@ export function classifyElectronProcess(processInfo: RawProcessInfo, mainPid: nu
   return 'child'
 }
 
+/**
+ * Only disposable Chromium helpers can be ended from the process manager.
+ * Web content (window) processes are excluded even though they are technically
+ * killable: each one owns a live workbench window, so ending it would discard
+ * unsaved work and interrupt any running task.
+ */
+const TERMINABLE_GROUPS = new Set(['webkit-gpu', 'webkit-networking', 'webkit-other'])
+
+export function isTerminableProcessGroup(group: string): boolean {
+  return TERMINABLE_GROUPS.has(group)
+}
+
+export interface EndProcessResult {
+  pid: number
+  terminated: boolean
+}
+
+/**
+ * Ends a single, disposable helper process. The main process pid is rejected
+ * here as a second line of defence so a stale or spoofed request can never
+ * terminate the application itself.
+ */
+export async function endDiagnosticProcess(
+  pid: number,
+  group: string,
+  mainPid = process.pid
+): Promise<EndProcessResult> {
+  if (!Number.isSafeInteger(pid) || pid <= 0) {
+    throw new Error('Invalid process id')
+  }
+  if (pid === mainPid) {
+    throw new Error('The application process cannot be ended')
+  }
+  if (!isTerminableProcessGroup(group)) {
+    throw new Error('This process cannot be ended from the process manager')
+  }
+  if (process.platform === 'win32') {
+    await execFileAsync('taskkill', ['/PID', String(pid), '/T', '/F'])
+  } else {
+    process.kill(pid, 'SIGKILL')
+  }
+  return { pid, terminated: true }
+}
+
 export async function getElectronProcessSnapshot(
   mainPid = process.pid
 ): Promise<ProcessDiagnosticsSnapshot> {
@@ -100,11 +151,15 @@ export async function getElectronProcessSnapshot(
   const relatedProcessIds = collectDescendantProcessIds(allProcesses, [mainPid])
   const processes = allProcesses
     .filter(processInfo => relatedProcessIds.has(processInfo.pid))
-    .map(processInfo => ({
-      ...processInfo,
-      group: classifyElectronProcess(processInfo, mainPid),
-      physical_footprint_kib: processInfo.rss_kib,
-    }))
+    .map(processInfo => {
+      const group = classifyElectronProcess(processInfo, mainPid)
+      return {
+        ...processInfo,
+        group,
+        physical_footprint_kib: processInfo.rss_kib,
+        terminable: isTerminableProcessGroup(group),
+      }
+    })
     .sort((left, right) => right.physical_footprint_kib - left.physical_footprint_kib)
 
   const groupsByName = new Map<string, ProcessDiagnosticsGroup>()

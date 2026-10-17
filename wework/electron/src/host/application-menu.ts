@@ -26,6 +26,7 @@ export const APPLICATION_MENU_ACTIONS = {
   decreaseFontSize: 'decreaseFontSize',
   resetFontSize: 'resetFontSize',
   developerCommands: 'developer-commands',
+  openProcessManager: 'open-process-manager',
 } as const
 
 export type ApplicationMenuAction =
@@ -114,6 +115,7 @@ const EN_LABELS = {
   developer: 'Developer tools',
   devTools: 'Open Chromium DevTools',
   commands: 'Developer commands…',
+  processManager: 'Process Manager',
   logs: 'Open log directory',
   file: 'File',
   newTaskTab: 'New task tab',
@@ -161,6 +163,7 @@ const ZH_LABELS: typeof EN_LABELS = {
   developer: '开发者工具',
   devTools: '打开 Chromium 开发者工具',
   commands: '开发者命令…',
+  processManager: '进程管理器',
   logs: '打开日志目录',
   file: '文件',
   newTaskTab: '新建任务标签页',
@@ -461,6 +464,11 @@ export class ApplicationMenu {
                 id: 'developer.commands',
                 label: labels.commands,
                 click: this.dispatch('developer-commands'),
+              },
+              {
+                id: 'developer.processManager',
+                label: labels.processManager,
+                click: this.dispatch('open-process-manager'),
               },
               {
                 id: 'developer.logs',

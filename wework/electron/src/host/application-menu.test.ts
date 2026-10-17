@@ -71,6 +71,7 @@ describe('application menu model', () => {
     expect(item('work.tasks')).toBe('Tasks')
     expect(item('work.projectSpaces')).toBe('Project spaces')
     expect(item('file.newTaskTab')).toBe('New task tab')
+    expect(item('developer.processManager')).toBe('Process Manager')
   })
 
   test('hides capability-gated items until the capability is reported', () => {

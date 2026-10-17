@@ -112,6 +112,7 @@ import { AppshotBridge } from '@/features/appshots/AppshotBridge'
 import { HarnessAppAutoLauncher } from '@/features/harness-apps/HarnessAppAutoLauncher'
 import { SystemDragPanel } from '@/features/system-drag/SystemDragPanel'
 import { SystemDragBridge } from '@/features/system-drag/SystemDragBridge'
+import { ProcessManagerPage } from '@/pages/ProcessManagerPage'
 import { installMacOSInputArrowKeyGuard } from '@/lib/macosInputArrowKeyGuard'
 import { useExperimentalFeaturesState } from '@/features/experimental-features/useExperimentalFeaturesEnabled'
 import { AppPreferencesProvider } from '@/features/app-preferences/AppPreferencesProvider'
@@ -754,7 +755,14 @@ function AppRoutes({ onWorkbenchStartupReadyChange, onOpenWeworkForAppshot }: Ap
 
 export default function App() {
   const path = useCurrentPath()
-  const content = isDesktopRuntime() && path === '/system-drag' ? <SystemDragPanel /> : <MainApp />
+  const content =
+    isDesktopRuntime() && path === '/system-drag' ? (
+      <SystemDragPanel />
+    ) : isDesktopRuntime() && path === '/process-manager' ? (
+      <ProcessManagerPage />
+    ) : (
+      <MainApp />
+    )
   return (
     <>
       <DshSlotSurface className="contents" slot={WEWORK_DSH_SLOTS.shellBefore} />

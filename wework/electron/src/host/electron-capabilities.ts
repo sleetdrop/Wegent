@@ -33,7 +33,7 @@ import type { ComputerUseService } from './computer-use-service.js'
 import { LocalAttachmentStore } from './local-attachment-store.js'
 import { readLocalFileChunk } from './local-file-reader.js'
 import { registerWorkspaceFileActions } from './workspace-file-actions.js'
-import { getElectronProcessSnapshot } from './process-diagnostics.js'
+import { getElectronProcessSnapshot, endDiagnosticProcess } from './process-diagnostics.js'
 import { sendE2EKey, sendE2EText, type E2EKeyPhase } from './e2e-keyboard.js'
 import {
   extractFilePathsFromNativePayloads,
@@ -222,6 +222,7 @@ export interface ElectronE2EHost {
   focusMainWindow: () => void | Promise<void>
   focusWindow: (windowLabel: string) => void
   hideMainWindow: () => Promise<void>
+  openProcessManager: () => void | Promise<void>
   dockVisible: () => boolean
   getSystemDragContext: () => { conversationTitle: string | null }
   runtimeDiagnostics: () => {
@@ -288,6 +289,8 @@ export function createElectronCapabilityRouter(
     focusMainWindow: () => undefined,
     focusWindow: () => undefined,
     hideMainWindow: () => Promise.reject(new Error('Main window backgrounding is unavailable')),
+    openProcessManager: () =>
+      Promise.reject(new Error('The process manager window is unavailable')),
     dockVisible: () => true,
     getSystemDragContext: () => ({ conversationTitle: null }),
     runtimeDiagnostics: () => ({
@@ -615,6 +618,7 @@ export function createElectronCapabilityRouter(
       }
       contents.openDevTools({ mode: 'detach', activate: true })
     },
+    openProcessManager: () => e2eHost.openProcessManager(),
   })
   router.register('e2e.capturePopoutWindow', () => e2eHost.capturePopout())
   router.register('e2e.capturePrimaryView', async params => {
@@ -1159,6 +1163,7 @@ export function registerDesktopServiceCapabilities(
   developer: {
     openLogDirectory: () => void | Promise<void>
     openDevTools: (windowLabel?: string) => void | Promise<void>
+    openProcessManager: () => void | Promise<void>
   }
 ): void {
   router.register('applicationMenu.popup', params => {
@@ -1191,6 +1196,15 @@ export function registerDesktopServiceCapabilities(
   router.register('developer.openLogDirectory', () => developer.openLogDirectory())
   router.register('developer.openDevTools', params =>
     developer.openDevTools(optionalStringParam(params, 'windowLabel'))
+  )
+  router.register('developer.openProcessManager', () => developer.openProcessManager())
+  router.register('diagnostics.processSnapshot', () => getElectronProcessSnapshot())
+  router.register('diagnostics.endProcess', params =>
+    endDiagnosticProcess(
+      integerParam(params, 'pid') ?? Number.NaN,
+      stringParam(params, 'group'),
+      process.pid
+    )
   )
   router.register('maintenance.cleanupTemporaryImages', () =>
     services.cleanupStaleTemporaryImages()

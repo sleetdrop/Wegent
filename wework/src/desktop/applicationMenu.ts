@@ -35,6 +35,10 @@ export function installApplicationMenuNavigation(): () => void {
       navigateTo('/settings')
     } else if (action === APPLICATION_MENU_ACTIONS.developerCommands) {
       openDeveloperCommandMenu()
+    } else if (action === APPLICATION_MENU_ACTIONS.openProcessManager) {
+      void invokeDesktopHost('developer.openProcessManager').catch(error => {
+        console.error('[application-menu] failed to open the process manager', error)
+      })
     } else if (action === APPLICATION_MENU_ACTIONS.openSearch) {
       requestOpenTaskSearch()
     } else if (action === APPLICATION_MENU_ACTIONS.openTerminal) {

@@ -18,6 +18,26 @@
   "navigation": {
     "home": "首页"
   },
+  "process_manager": {
+    "title": "进程管理器",
+    "subtitle": "当前应用正在运行的进程。",
+    "refresh": "刷新",
+    "column_task": "任务",
+    "column_cpu": "CPU %",
+    "column_memory": "内存",
+    "column_pid": "进程 ID",
+    "application_process": "应用进程",
+    "end_task": "结束任务",
+    "confirm": "确认",
+    "group.main": "应用",
+    "group.webkit-gpu": "GPU 进程",
+    "group.webkit-networking": "网络服务",
+    "group.webkit-other": "辅助进程",
+    "group.webkit-webcontent": "窗口",
+    "group.executor": "执行器",
+    "group.codex-app-server": "Codex 应用服务",
+    "group.child": "子进程"
+  },
   "project_ai": {
     "file_unavailable": "这个项目执行器无法读取所选文件，请使用本地项目或在任务详情中上传文件。",
     "model_unavailable": "模型列表加载失败，请稍后重试。"

@@ -304,6 +304,7 @@ let popoutWindow: BrowserWindow | null = null
 let popoutWindowCreationPromise: Promise<BrowserWindow> | null = null
 let popoutWindowReadyPromise: Promise<void> | null = null
 let popoutWindowMode: PopoutWindowMode = 'composer'
+let processManagerWindow: BrowserWindow | null = null
 let popoutShortcut: GlobalShortcutController | null = null
 let systemDragContext: { conversationTitle: string | null } = { conversationTitle: null }
 let pendingSystemDrops: Array<{
@@ -1093,6 +1094,60 @@ async function createAuxiliaryWindow(
   } catch (error) {
     if (pendingSystemDragWindow === auxiliaryWindow) pendingSystemDragWindow = null
     if (!auxiliaryWindow.isDestroyed()) auxiliaryWindow.destroy()
+    throw error
+  }
+}
+
+/**
+ * Opens (or focuses) the standalone process manager window. It is a plain,
+ * resizable window that loads the renderer's /process-manager route, mirroring
+ * how the popout and system-drag auxiliary windows are created.
+ */
+async function openProcessManagerWindow(): Promise<void> {
+  if (!desktopRuntime) throw new Error('Core desktop runtime is unavailable')
+  const existing = processManagerWindow
+  if (existing && !existing.isDestroyed()) {
+    if (existing.isMinimized()) existing.restore()
+    existing.show()
+    existing.focus()
+    return
+  }
+  const target = resolveDshAppRoute(desktopRuntime.coreDshUrl(), 'process-manager')
+  const window = new BrowserWindow({
+    width: 720,
+    height: 640,
+    minWidth: 520,
+    minHeight: 360,
+    title: 'Process Manager',
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#181818' : '#fafafa',
+    show: false,
+    webPreferences: {
+      backgroundThrottling: false,
+      preload: dshPreloadPath,
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+    },
+  })
+  processManagerWindow = window
+  secureDshContents(window.webContents, desktopRuntime.coreDshUrl())
+  registerDshWindowLabel(window.webContents, 'process-manager')
+  window.webContents.on('did-fail-load', (_event, code, description, url) => {
+    console.error('[process-manager] renderer failed to load', { code, description, url })
+  })
+  window.on('closed', () => {
+    if (processManagerWindow === window) processManagerWindow = null
+  })
+  try {
+    await window.loadURL(target.toString(), {
+      extraHeaders: 'X-Wework-Window-Label: process-manager',
+    })
+    await waitForRendererSelector(window.webContents, '[data-testid="process-manager-window"]')
+    window.show()
+    window.focus()
+  } catch (error) {
+    if (processManagerWindow === window) processManagerWindow = null
+    if (!window.isDestroyed()) window.destroy()
     throw error
   }
 }
@@ -1895,7 +1950,9 @@ async function configureDesktopRuntime(): Promise<void> {
                 ? (popoutWindow?.webContents ?? null)
                 : windowLabel === 'system-drag-panel'
                   ? (systemDragWindow?.webContents ?? null)
-                  : (workspaceWindows.get(windowLabel)?.webContents ?? null),
+                  : windowLabel === 'process-manager'
+                    ? (processManagerWindow?.webContents ?? null)
+                    : (workspaceWindows.get(windowLabel)?.webContents ?? null),
           cancelCloseToTray: cancelMainWindowClose,
           closeToTray: closeMainWindowToTray,
           focusMainWindow: reactivateMainWindow,
@@ -1909,6 +1966,7 @@ async function configureDesktopRuntime(): Promise<void> {
             if (target) presentWindow(target)
           },
           hideMainWindow: hideMainWindowToBackground,
+          openProcessManager: () => openProcessManagerWindow(),
           dockVisible: () => dockVisible,
           rendererStartupReady: createStartupReadyHandler(async source => {
             if (!mainWindow || mainWindow.isDestroyed()) return

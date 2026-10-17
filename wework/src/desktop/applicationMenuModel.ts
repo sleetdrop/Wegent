@@ -31,6 +31,7 @@ export const APPLICATION_MENU_ACTIONS = {
   decreaseFontSize: 'decreaseFontSize',
   resetFontSize: 'resetFontSize',
   developerCommands: 'developer-commands',
+  openProcessManager: 'open-process-manager',
 } as const
 
 export type ApplicationMenuAction =
